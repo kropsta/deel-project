@@ -1,37 +1,35 @@
 // pages/api/leads.js
 // GET — return all leads | DELETE — clear all leads
 
+const { initDb, getLeads, clearLeads, getLastRun } = require('../../lib/db');
+
 export default async function handler(req, res) {
-    // Try Vercel KV first
-    const useKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+    try {
+        await initDb();
+    } catch (e) {
+        console.error('DB init failed:', e.message);
+        return res.status(500).json({ error: 'Database unavailable', leads: [], lastRun: null });
+    }
 
     if (req.method === 'GET') {
         try {
-            if (useKV) {
-                const { kv } = await import('@vercel/kv');
-                const leads = await kv.get('leads');
-                const lastRun = await kv.get('lastRun');
-                return res.json({ leads: leads ? JSON.parse(leads) : [], lastRun });
-            }
-        } catch (_) { }
-        // Fallback to in-memory
-        return res.json({
-            leads: global._agencyLeads || [],
-            lastRun: global._agencyLastRun || null,
-        });
+            const leads = await getLeads();
+            const lastRun = await getLastRun();
+            return res.json({ leads, lastRun });
+        } catch (e) {
+            console.error('GET leads error:', e.message);
+            return res.status(500).json({ error: e.message, leads: [], lastRun: null });
+        }
     }
 
     if (req.method === 'DELETE') {
         try {
-            if (useKV) {
-                const { kv } = await import('@vercel/kv');
-                await kv.del('leads');
-                await kv.del('lastRun');
-            }
-        } catch (_) { }
-        global._agencyLeads = [];
-        global._agencyLastRun = null;
-        return res.json({ ok: true });
+            await clearLeads();
+            return res.json({ ok: true });
+        } catch (e) {
+            console.error('DELETE leads error:', e.message);
+            return res.status(500).json({ error: e.message });
+        }
     }
 
     res.status(405).end();

@@ -1,10 +1,8 @@
 // pages/api/scrape.js
-// SSE endpoint — streams scraper progress to the client
+// SSE endpoint — streams scraper progress, then saves results to Neon Postgres
 
 const { runScraper } = require('../../lib/scraper');
-
-// In-memory store (works without Vercel KV)
-let inMemoryLeads = [];
+const { initDb, saveLeads, setLastRun } = require('../../lib/db');
 
 export const config = {
     api: { bodyParser: false },
@@ -27,30 +25,31 @@ export default async function handler(req, res) {
 
     send({ type: 'log', message: '🚀 Agency Scraper started...' });
 
+    // Ensure DB tables exist
+    try {
+        await initDb();
+        send({ type: 'log', message: '🗄️  Connected to Neon Postgres database' });
+    } catch (dbErr) {
+        send({ type: 'log', message: `⚠ DB init warning: ${dbErr.message}` });
+    }
+
     try {
         for await (const event of runScraper()) {
             if (event.type === 'log') {
                 send({ type: 'log', message: event.message });
             } else if (event.type === 'done') {
-                // Persist leads
-                inMemoryLeads = event.leads;
+                const lastRun = new Date().toISOString();
 
-                // Try Vercel KV if configured
+                // Save to Neon Postgres
                 try {
-                    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-                        const { kv } = await import('@vercel/kv');
-                        await kv.set('leads', JSON.stringify(event.leads));
-                        await kv.set('lastRun', new Date().toISOString());
-                        send({ type: 'log', message: '💾 Saved to Vercel KV' });
-                    } else {
-                        await saveLeadsMeta(event.leads);
-                        send({ type: 'log', message: '💾 Saved to in-memory store' });
-                    }
-                } catch (kvErr) {
-                    send({ type: 'log', message: `⚠ KV save skipped: ${kvErr.message}` });
+                    await saveLeads(event.leads);
+                    await setLastRun(lastRun);
+                    send({ type: 'log', message: `💾 Saved ${event.leads.length} leads to Neon Postgres` });
+                } catch (saveErr) {
+                    send({ type: 'log', message: `⚠ DB save error: ${saveErr.message}` });
                 }
 
-                send({ type: 'done', leads: event.leads, lastRun: new Date().toISOString() });
+                send({ type: 'done', leads: event.leads, lastRun });
             }
         }
     } catch (err) {
@@ -59,13 +58,4 @@ export default async function handler(req, res) {
     }
 
     res.end();
-}
-
-// Global in-memory store helper (exported for leads.js to import)
-global._agencyLeads = global._agencyLeads || [];
-global._agencyLastRun = global._agencyLastRun || null;
-
-async function saveLeadsMeta(leads) {
-    global._agencyLeads = leads;
-    global._agencyLastRun = new Date().toISOString();
 }
