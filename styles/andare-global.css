@@ -1,0 +1,40 @@
+/* ============================================================
+   Andare Residences — Global Base Styles
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500;600&display=swap');
+
+/* ---------- CSS Variables ---------- */
+:root {
+    --steel-blue: #8FA8C8;
+    --steel-blue-light: #b3c8de;
+    --steel-blue-dark: #6b8aab;
+    --warm-white: #F5F3EF;
+    --warm-white-2: #EDE9E2;
+    --navy: #1a1a2e;
+    --navy-light: #2c2c4a;
+    --gold: #C9A96E;
+    --text-muted: #6b7280;
+    --shadow-soft: 0 4px 40px rgba(26, 26, 46, 0.08);
+    --shadow-medium: 0 8px 60px rgba(26, 26, 46, 0.14);
+    --transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- Andare page base ---------- */
+body.andare-page {
+    font-family: 'Inter', sans-serif;
+    background: var(--warm-white);
+    color: var(--navy);
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    margin: 0;
+    padding: 0;
+}
+
+body.andare-page *,
+body.andare-page *::before,
+body.andare-page *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
