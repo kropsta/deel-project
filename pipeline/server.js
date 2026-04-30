@@ -64,10 +64,18 @@ OUTREACH RULES:
 
 Return ONLY valid JSON with keys: coldEmail (string, \\n\\n between paragraphs), talkTrack (array of 3 strings, each under 20 words).`
 
-async function searchExa(query, daysBack = 30) {
-  const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0]
+async function searchExa(query, daysBack) {
+  const body = {
+    query,
+    numResults: 10,
+    contents: { text: { maxCharacters: 800 } },
+  }
+
+  if (daysBack) {
+    body.startPublishedDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+  }
 
   const res = await fetch('https://api.exa.ai/search', {
     method: 'POST',
@@ -75,12 +83,7 @@ async function searchExa(query, daysBack = 30) {
       'Content-Type': 'application/json',
       'x-api-key': process.env.EXA_API_KEY,
     },
-    body: JSON.stringify({
-      query,
-      numResults: 10,
-      contents: { text: { maxCharacters: 600 } },
-      startPublishedDate: startDate,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -95,13 +98,16 @@ async function searchExa(query, daysBack = 30) {
 app.post('/api/find-startups', async (req, res) => {
   const { industry = 'all', region = 'all', daysBack = 30 } = req.body
 
-  try {
-    const queries = [
-      `pre-seed seed funding round startup announcement${industry !== 'all' ? ' ' + industry : ''}${region !== 'all' ? ' ' + region : ''}`,
-      `startup raises seed round remote team hiring${region !== 'all' ? ' ' + region : ''}`,
-      `new startup funding pre-seed seed 2025 2026 global remote`,
-    ]
+  const industryClause = industry !== 'all' ? ` in ${industry}` : ''
+  const regionClause = region !== 'all' ? ` in ${region}` : ''
 
+  const queries = [
+    `startup just announced seed funding round${industryClause}${regionClause}`,
+    `new company raised pre-seed or seed investment to build${industryClause}${regionClause}`,
+    `early stage startup secures funding to hire global team${regionClause}`,
+  ]
+
+  try {
     const allResults = []
     const seen = new Set()
 
@@ -115,29 +121,31 @@ app.post('/api/find-startups', async (req, res) => {
           }
         }
       } catch (e) {
-        console.warn('Exa query failed:', e.message)
+        console.warn('Exa query failed:', query, e.message)
       }
     }
 
+    console.log(`Exa returned ${allResults.length} total articles`)
+
     if (allResults.length === 0) {
-      return res.json([])
+      return res.status(500).json({ error: 'Exa returned no results. Check your EXA_API_KEY is set correctly in Vercel environment variables.' })
     }
 
     const articlesText = allResults
       .slice(0, 20)
       .map((r, i) =>
-        `[${i + 1}] ${r.title}\nPublished: ${r.publishedDate || 'unknown'}\n${r.text || '(no content)'}`
+        `[${i + 1}] TITLE: ${r.title}\nDATE: ${r.publishedDate || 'unknown'}\nURL: ${r.url}\nCONTENT: ${r.text || '(no content)'}`
       )
       .join('\n\n---\n\n')
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
+      max_tokens: 4000,
       system: PARSE_PROMPT,
       messages: [
         {
           role: 'user',
-          content: `Extract pre-seed and seed funded startups from these articles. Filter to companies that would be good Deel prospects (remote-first, global teams, fast-growing, SMB-sized):\n\n${articlesText}`,
+          content: `Here are recent articles. Extract ALL startups that raised any funding (pre-seed, seed, or early stage). Be inclusive — include any company that received investment, even if the stage isn't explicitly labeled. Return as many as you can find:\n\n${articlesText}`,
         },
       ],
     })
@@ -148,7 +156,10 @@ app.post('/api/find-startups', async (req, res) => {
       companies = JSON.parse(raw)
     } catch {
       const match = raw.match(/\[[\s\S]*\]/)
-      if (!match) throw new Error('Could not parse company list from model response')
+      if (!match) {
+        console.error('Raw model response:', raw.slice(0, 500))
+        throw new Error('Could not parse company list from model response')
+      }
       companies = JSON.parse(match[0])
     }
 
