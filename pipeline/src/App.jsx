@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
-import ScoreGauge from './components/ScoreGauge.jsx'
-import { SnapshotCard, ColdEmailCard, TalkTrackCard } from './components/ResultCard.jsx'
-import SkeletonLoader from './components/SkeletonLoader.jsx'
+import StartupCard from './components/StartupCard.jsx'
 
 function LightningIcon({ className = '' }) {
   return (
@@ -11,244 +9,201 @@ function LightningIcon({ className = '' }) {
   )
 }
 
-function InputField({ label, id, type = 'text', placeholder, value, onChange, required }) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-xs font-medium text-slate-400 tracking-wide">
-        {label} {required && <span className="text-blue-500">*</span>}
-      </label>
-      <input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        className="input-field"
-        autoComplete="off"
-      />
-    </div>
-  )
-}
+const INDUSTRIES = ['All Industries', 'SaaS', 'Fintech', 'HR Tech', 'HealthTech', 'E-commerce', 'AI / ML', 'DevTools', 'Climate Tech', 'EdTech']
+const REGIONS = ['All Regions', 'United States', 'Europe', 'Latin America', 'Asia Pacific', 'Africa', 'Middle East']
+const DAYS_OPTIONS = [{ label: 'Last 7 days', value: 7 }, { label: 'Last 30 days', value: 30 }, { label: 'Last 90 days', value: 90 }]
 
-function ErrorBanner({ message, onDismiss }) {
+function FilterSelect({ value, onChange, options }) {
   return (
-    <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400 animate-fade-in">
-      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <span className="flex-1">{message}</span>
-      <button onClick={onDismiss} className="text-red-400 hover:text-red-300 flex-shrink-0">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="bg-[#161b35] border border-[#1c2240] rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer appearance-none pr-8 relative"
+      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
+    >
+      {options.map(opt => (
+        <option key={typeof opt === 'string' ? opt : opt.value} value={typeof opt === 'string' ? opt : opt.value}>
+          {typeof opt === 'string' ? opt : opt.label}
+        </option>
+      ))}
+    </select>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-8 space-y-4">
+    <div className="col-span-full flex flex-col items-center justify-center py-24 text-center space-y-4">
       <div className="w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center">
         <LightningIcon className="w-8 h-8 text-blue-500 opacity-60" />
       </div>
       <div>
-        <h3 className="text-slate-300 font-semibold mb-1">Ready to prospect</h3>
+        <h3 className="text-slate-300 font-semibold mb-1">Find your next prospect</h3>
         <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
-          Enter a company and prospect name on the left to generate a full intelligence report.
+          Hit the button to pull recently funded pre-seed and seed startups — scored and ready to work.
         </p>
-      </div>
-      <div className="flex flex-wrap gap-2 justify-center pt-2">
-        {['Company Snapshot', 'ICP Score', 'Cold Email', 'Talk Track'].map(tag => (
-          <span key={tag} className="text-xs px-2.5 py-1 rounded-full bg-[#161b35] border border-[#1c2240] text-slate-500">
-            {tag}
-          </span>
-        ))}
       </div>
     </div>
   )
 }
 
+function LoadingGrid() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="card animate-pulse space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="space-y-1.5">
+              <div className="h-4 bg-[#1c2240] rounded w-32" />
+              <div className="h-3 bg-[#1c2240] rounded w-24" />
+            </div>
+            <div className="h-6 bg-[#1c2240] rounded-full w-20" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-3 bg-[#1c2240] rounded w-full" />
+            <div className="h-3 bg-[#1c2240] rounded w-4/5" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-6 bg-[#1c2240] rounded-full w-16" />
+            <div className="h-6 bg-[#1c2240] rounded w-12" />
+          </div>
+          <div className="h-12 bg-[#1c2240] rounded-lg" />
+          <div className="h-8 bg-[#1c2240] rounded-lg" />
+        </div>
+      ))}
+    </>
+  )
+}
+
 export default function App() {
-  const [form, setForm] = useState({
-    companyName: '',
-    websiteUrl: '',
-    prospectName: '',
-    prospectTitle: '',
-  })
+  const [industry, setIndustry] = useState('All Industries')
+  const [region, setRegion] = useState('All Regions')
+  const [daysBack, setDaysBack] = useState(30)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [startups, setStartups] = useState([])
   const [error, setError] = useState(null)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  function handleChange(field) {
-    return (e) => setForm(prev => ({ ...prev, [field]: e.target.value }))
-  }
-
-  async function handleAnalyze(e) {
-    e.preventDefault()
-    if (!form.companyName.trim() || !form.prospectName.trim()) return
-
+  async function handleFind() {
     setLoading(true)
     setError(null)
-    setResult(null)
+    setStartups([])
+    setHasSearched(true)
 
     try {
-      const res = await fetch('/api/analyze', {
+      const res = await fetch('/api/find-startups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          industry: industry === 'All Industries' ? 'all' : industry,
+          region: region === 'All Regions' ? 'all' : region,
+          daysBack,
+        }),
       })
 
       const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || `Server error ${res.status}`)
-      }
-
-      setResult(data)
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
+      setStartups(Array.isArray(data) ? data : [])
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  function handleReset() {
-    setResult(null)
-    setError(null)
-    setForm({ companyName: '', websiteUrl: '', prospectName: '', prospectTitle: '' })
-  }
-
-  const canSubmit = form.companyName.trim() && form.prospectName.trim() && !loading
+  const sortedStartups = [...startups].sort((a, b) => b.icpScore - a.icpScore)
 
   return (
     <div className="min-h-screen bg-[#0d0f1a]">
       {/* Header */}
       <header className="border-b border-[#1c2240] bg-[#0d0f1a]/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
               <LightningIcon className="w-4 h-4 text-blue-400" />
             </div>
             <span className="font-bold text-white tracking-tight text-lg">Pipeline</span>
             <span className="hidden sm:block text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-600/15 border border-blue-500/25 text-blue-400 ml-1">
-              SDR Intelligence
+              Funded Startup Finder
             </span>
           </div>
-          <div className="text-xs text-slate-600">
-            Powered by Claude
-          </div>
+          <p className="text-xs text-slate-600">Powered by Deel · Exa · Claude</p>
         </div>
       </header>
 
-      {/* Main layout */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
+      {/* Search bar */}
+      <div className="border-b border-[#1c2240] bg-[#111527]">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center gap-3">
+          <FilterSelect value={industry} onChange={setIndustry} options={INDUSTRIES} />
+          <FilterSelect value={region} onChange={setRegion} options={REGIONS} />
+          <FilterSelect value={daysBack} onChange={v => setDaysBack(Number(v))} options={DAYS_OPTIONS} />
 
-          {/* Left panel — Input */}
-          <div className="space-y-4">
-            <div className="card">
-              <div className="mb-5">
-                <h2 className="text-sm font-semibold text-white mb-1">Prospect Details</h2>
-                <p className="text-xs text-slate-500">Fill in what you know and Pipeline does the rest.</p>
-              </div>
-
-              <form onSubmit={handleAnalyze} className="space-y-4">
-                <InputField
-                  label="Company Name"
-                  id="companyName"
-                  placeholder="Acme Corp"
-                  value={form.companyName}
-                  onChange={handleChange('companyName')}
-                  required
-                />
-                <InputField
-                  label="Website URL"
-                  id="websiteUrl"
-                  type="url"
-                  placeholder="https://acme.com"
-                  value={form.websiteUrl}
-                  onChange={handleChange('websiteUrl')}
-                />
-                <InputField
-                  label="Prospect Name"
-                  id="prospectName"
-                  placeholder="Jane Smith"
-                  value={form.prospectName}
-                  onChange={handleChange('prospectName')}
-                  required
-                />
-                <InputField
-                  label="Prospect Title"
-                  id="prospectTitle"
-                  placeholder="VP of Sales"
-                  value={form.prospectTitle}
-                  onChange={handleChange('prospectTitle')}
-                />
-
-                <div className="pt-1 space-y-2">
-                  <button type="submit" disabled={!canSubmit} className="btn-primary">
-                    {loading ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <LightningIcon className="w-4 h-4" />
-                        Analyze Prospect
-                      </>
-                    )}
-                  </button>
-
-                  {result && (
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors py-1.5"
-                    >
-                      Clear &amp; start over
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            {/* Tips card */}
-            <div className="card bg-blue-600/5 border-blue-500/15">
-              <p className="text-xs font-semibold text-blue-400 mb-2 uppercase tracking-wider">Pro Tips</p>
-              <ul className="space-y-1.5 text-xs text-slate-500 leading-relaxed">
-                <li className="flex gap-2"><span className="text-blue-500 flex-shrink-0">→</span>Adding the website URL improves accuracy significantly</li>
-                <li className="flex gap-2"><span className="text-blue-500 flex-shrink-0">→</span>Include the prospect's title for a more tailored email</li>
-                <li className="flex gap-2"><span className="text-blue-500 flex-shrink-0">→</span>Scores above 70 are worth prioritizing in your sequence</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Right panel — Results */}
-          <div className="min-h-[400px]">
-            {error && (
-              <div className="mb-4">
-                <ErrorBanner message={error} onDismiss={() => setError(null)} />
-              </div>
+          <button
+            onClick={handleFind}
+            disabled={loading}
+            className="ml-auto btn-primary w-auto px-6 py-2 text-sm"
+          >
+            {loading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Searching...
+              </>
+            ) : (
+              <>
+                <LightningIcon className="w-4 h-4" />
+                Find Funded Startups
+              </>
             )}
+          </button>
+        </div>
+      </div>
 
-            {loading && <SkeletonLoader />}
-
-            {!loading && !result && !error && <EmptyState />}
-
-            {!loading && result && (
-              <div className="space-y-4">
-                <SnapshotCard snapshot={result.snapshot} />
-                <ScoreGauge score={result.icpScore} breakdown={result.icpBreakdown} />
-                <ColdEmailCard coldEmail={result.coldEmail} />
-                <TalkTrackCard talkTrack={result.talkTrack} />
-              </div>
-            )}
+      {/* Results */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {error && (
+          <div className="mb-6 flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400 animate-fade-in">
+            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>{error}</span>
           </div>
+        )}
+
+        {!loading && hasSearched && !error && startups.length === 0 && (
+          <div className="text-center py-16 text-slate-500 text-sm">
+            No pre-seed or seed companies found for this search. Try expanding the date range or changing filters.
+          </div>
+        )}
+
+        {!loading && startups.length > 0 && (
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              <span className="text-slate-300 font-semibold">{startups.length}</span> startups found · sorted by ICP fit
+            </p>
+            <button
+              onClick={handleFind}
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {loading ? (
+            <LoadingGrid />
+          ) : hasSearched && startups.length > 0 ? (
+            sortedStartups.map((company, i) => (
+              <StartupCard key={`${company.name}-${i}`} company={company} />
+            ))
+          ) : !hasSearched ? (
+            <EmptyState />
+          ) : null}
         </div>
       </div>
     </div>

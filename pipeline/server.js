@@ -11,97 +11,196 @@ app.use(express.json())
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const SYSTEM_PROMPT = `You are an SDR at Deel writing prospect research and outreach. Deel is a global HR and payroll platform — NOT a sales tool, NOT a CRM, NOT a revenue platform. Deel helps companies hire, manage, and pay their teams anywhere in the world.
+const DEEL_CONTEXT = `
+Deel is a global HR and payroll platform for startups and SMBs (1–200 employees). Deel helps companies hire, manage, and pay their teams anywhere in the world.
 
-WHAT DEEL DOES (pick 1-2 most relevant products per prospect):
-- Deel EOR: Hire full-time employees in 100+ countries without a local legal entity. Deel becomes the legal employer, handling contracts, taxes, benefits, and local compliance. Costs a fraction of setting up a foreign entity ($20k–$100k+).
-- Deel Contractor Management: Onboard and pay global contractors compliantly. Includes misclassification protection via "Deel Shield."
-- Deel Global Payroll: Run payroll across multiple countries from one platform. Deel owns its own payroll infrastructure — no third-party processors.
-- Deel PEO: Co-employment for US-only companies wanting Fortune 500-level benefits and HR admin across all 50 states.
-- Deel HR (HRIS): Free global HRIS that replaces BambooHR, Lattice, and 14 other tools. Covers onboarding, org charts, time-off, performance, and documents — all synced to payroll automatically.
-- Deel IT: Device provisioning, MDM, and endpoint protection for distributed teams in 130+ countries, tied to onboarding/offboarding.
-- Deel Benefits: Country-specific benefits with deductions synced directly to payroll — no manual reconciliation.
-- Deel Mobility: Visa applications, work permits, and global relocation support across 100+ countries.
-- Deel AI: AI agents that answer compliance, payroll, PTO, and hiring questions instantly.
-- Deel ATS: Native applicant tracking inside Deel HR — no separate recruiting tool needed.
+Key products:
+- Deel EOR: Hire full-time employees in 100+ countries without setting up a local legal entity
+- Deel Contractor Management: Onboard and pay global contractors compliantly, with misclassification protection
+- Deel Global Payroll: Run multi-country payroll from one platform
+- Deel HR (HRIS): Free global HRIS replacing BambooHR, Lattice, and 14 other tools
+- Deel PEO: Co-employment for US companies, Fortune 500-level benefits
+- Deel IT: Device provisioning and MDM for distributed teams
+- Deel Benefits: Localized benefits synced to payroll
 
-CORE VALUE PROP: Most companies use 10–16 disconnected tools to manage HR, payroll, benefits, compliance, and equipment for a global team. Deel consolidates all of it into one platform.
+Deel's sweet spot: seed and pre-seed startups that are remote-first, have global ambitions, or are starting to hire internationally. These companies are too small for enterprise HCM tools, moving too fast for manual processes, and need compliance coverage as they grow.
 
-TARGET BUYER: HR leaders, People Ops managers, Payroll managers, CPOs, VPs of People, Founders, and CEOs — anyone who owns hiring, managing, or paying their team. These people are overwhelmed by compliance complexity, manual payroll processes, and tool sprawl.
+Target buyers: Founders, CEOs, COOs, HR Managers, People Ops, Head of People — anyone owning hiring and team management.
 
-IDEAL CUSTOMER PROFILE (SMB-focused, 1–200 employees):
-- Small to mid-sized companies (1–200 employees) — this is the sweet spot
-- Has team members or contractors in more than one country, OR is planning to hire internationally
-- Remote-first or distributed workforce
-- Fast-growing startup or scale-up, especially VC/PE-backed
-- Using fragmented tools: BambooHR, Gusto, ADP, Rippling, Papaya, Remote, Oyster, Workday, Lattice, etc.
-- Contractor-heavy model with misclassification risk
-- Recently raised funding and scaling headcount
+Pain points Deel solves: setting up entities abroad, paying contractors in multiple currencies, staying compliant across countries, onboarding international hires fast, replacing fragmented HR tools.
+`
 
-LOW ICP signals (score lower):
-- Pure domestic workforce with no international hiring plans
-- Large enterprise (1000+ employees) already on mature HCM platforms
-- Industries with no global workforce needs
+const PARSE_PROMPT = `You are a funding intelligence analyst for Deel's SDR team. You receive raw text from recent news articles about startup funding rounds.
+
+Your job: extract every distinct startup mentioned that raised a pre-seed or seed round. For each one, return a structured JSON array.
+
+For each company include:
+- name: string
+- stage: "Pre-seed" | "Seed"
+- amount: string (e.g. "$2.5M", "undisclosed")
+- description: string — one sentence on what the company does
+- industry: string — e.g. "HR Tech", "Fintech", "SaaS", "E-commerce", "HealthTech", etc.
+- location: string — city/country if mentioned, else "Unknown"
+- teamSize: string — if mentioned, else "Early stage"
+- fundedDate: string — approximate date if mentioned, else "Recent"
+- whyDeel: string — one sentence on the most relevant Deel product for this company and why (focus on: international hiring, contractor payments, global payroll, remote team management)
+- icpScore: number — 0 to 100 score for Deel's ICP fit. Score higher for: remote-first, international teams, hiring across borders, fast-growing, VC-backed. Score lower for: purely domestic, non-tech, already using enterprise HCM.
+
+Return ONLY a valid JSON array. No markdown fences. No explanation. If no pre-seed or seed companies are found, return an empty array [].`
+
+const OUTREACH_PROMPT = `You are an SDR at Deel — a global HR and payroll platform for startups. Write outreach for a specific recently funded startup.
+
+${DEEL_CONTEXT}
 
 OUTREACH RULES:
-- The cold email and talk track must speak to HR, people ops, or payroll pain — not sales, not revenue, not closing deals
-- Pain points to reference: compliance across countries, paying people in multiple currencies, setting up entities abroad, contractor misclassification risk, too many HR tools, manual payroll errors, slow international onboarding
-- Always address the prospect by first name
-- Always name a specific Deel product that fits their situation
-- No clichés: no "I hope this finds you well", no "I wanted to reach out", no "touching base"
-- Write like a sharp human, not a template
+- Address the prospect by first name
+- Email must speak to their specific situation as a newly funded startup: building out their team, hiring internationally, managing remote workers, staying compliant
+- Tie paragraph 1 to something specific about their company (what they do, their funding, their growth stage)
+- Paragraph 2: connect to a specific Deel product that solves their pain
+- Paragraph 3: low-friction CTA — "worth a 15-minute call?" style
+- NO clichés: no "I hope this finds you well", no "I wanted to reach out", no "touching base", no "synergy"
+- Under 150 words total
+- Talk track should feel like natural cold call openers, not scripts
 
-Return ONLY a valid JSON object with exactly these keys:
-- snapshot: string — 2-3 sentences on what the company does, their team size/footprint (remote? global? contractor-heavy?), and any hiring or growth signals
-- icpScore: number — integer 0–100 reflecting fit with Deel's SMB ICP (1–200 employees, global or distributed teams)
-- icpBreakdown: object with:
-    - companySizeFit: { score: number (0–25), rationale: string — are they 1–200 employees? penalise heavily if too large or too small }
-    - industryFit: { score: number (0–25), rationale: string — does their industry typically have distributed or international workforce needs? }
-    - likelyBudget: { score: number (0–25), rationale: string — can they afford Deel? consider funding, revenue, stage }
-    - growthSignals: { score: number (0–25), rationale: string — are they hiring, expanding internationally, or scaling headcount? }
-- coldEmail: string — 3-paragraph email from a Deel SDR to this specific prospect. Paragraph 1: hook tied to something specific about their company or role. Paragraph 2: connect their pain to a specific Deel product. Paragraph 3: low-friction CTA. Under 150 words total. \\n\\n between paragraphs.
-- talkTrack: array of exactly 3 strings — cold call openers about HR, payroll, or global hiring pain. Each under 20 words. Natural, not scripted.
+Return ONLY valid JSON with keys: coldEmail (string, \\n\\n between paragraphs), talkTrack (array of 3 strings, each under 20 words).`
 
-Return ONLY the JSON. No markdown fences, no explanation.`
+async function searchExa(query, daysBack = 30) {
+  const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0]
 
-app.post('/api/analyze', async (req, res) => {
-  const { companyName, websiteUrl, prospectName, prospectTitle } = req.body
+  const res = await fetch('https://api.exa.ai/search', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.EXA_API_KEY,
+    },
+    body: JSON.stringify({
+      query,
+      numResults: 10,
+      contents: { text: { maxCharacters: 600 } },
+      startPublishedDate: startDate,
+    }),
+  })
 
-  if (!companyName || !prospectName) {
-    return res.status(400).json({ error: 'companyName and prospectName are required' })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Exa API error: ${res.status} ${err}`)
   }
 
-  const userPrompt = `Research this prospect and generate Deel outreach:
+  const data = await res.json()
+  return data.results || []
+}
 
-Company: ${companyName}
-Website: ${websiteUrl || 'not provided'}
+app.post('/api/find-startups', async (req, res) => {
+  const { industry = 'all', region = 'all', daysBack = 30 } = req.body
+
+  try {
+    const queries = [
+      `pre-seed seed funding round startup announcement${industry !== 'all' ? ' ' + industry : ''}${region !== 'all' ? ' ' + region : ''}`,
+      `startup raises seed round remote team hiring${region !== 'all' ? ' ' + region : ''}`,
+      `new startup funding pre-seed seed 2025 2026 global remote`,
+    ]
+
+    const allResults = []
+    const seen = new Set()
+
+    for (const query of queries) {
+      try {
+        const results = await searchExa(query, daysBack)
+        for (const r of results) {
+          if (!seen.has(r.url)) {
+            seen.add(r.url)
+            allResults.push(r)
+          }
+        }
+      } catch (e) {
+        console.warn('Exa query failed:', e.message)
+      }
+    }
+
+    if (allResults.length === 0) {
+      return res.json([])
+    }
+
+    const articlesText = allResults
+      .slice(0, 20)
+      .map((r, i) =>
+        `[${i + 1}] ${r.title}\nPublished: ${r.publishedDate || 'unknown'}\n${r.text || '(no content)'}`
+      )
+      .join('\n\n---\n\n')
+
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 3000,
+      system: PARSE_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `Extract pre-seed and seed funded startups from these articles. Filter to companies that would be good Deel prospects (remote-first, global teams, fast-growing, SMB-sized):\n\n${articlesText}`,
+        },
+      ],
+    })
+
+    const raw = message.content[0].text.trim()
+    let companies
+    try {
+      companies = JSON.parse(raw)
+    } catch {
+      const match = raw.match(/\[[\s\S]*\]/)
+      if (!match) throw new Error('Could not parse company list from model response')
+      companies = JSON.parse(match[0])
+    }
+
+    res.json(Array.isArray(companies) ? companies : [])
+  } catch (err) {
+    console.error('find-startups error:', err.message)
+    res.status(500).json({ error: err.message || 'Failed to find startups' })
+  }
+})
+
+app.post('/api/generate-outreach', async (req, res) => {
+  const { company, prospectName, prospectTitle } = req.body
+
+  if (!company || !prospectName) {
+    return res.status(400).json({ error: 'company and prospectName are required' })
+  }
+
+  const userPrompt = `Generate Deel outreach for this newly funded startup:
+
+Company: ${company.name}
+What they do: ${company.description}
+Funding: ${company.stage} — ${company.amount}
+Location: ${company.location}
+Industry: ${company.industry}
+Why Deel fits: ${company.whyDeel}
+
 Prospect: ${prospectName}${prospectTitle ? `, ${prospectTitle}` : ''}
 
-Based on what you know about this company, assess their fit for Deel's global HR and payroll platform, then return the JSON.`
+Write the cold email and talk track.`
 
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
-      system: SYSTEM_PROMPT,
+      max_tokens: 800,
+      system: OUTREACH_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
     })
 
     const raw = message.content[0].text.trim()
-
-    let parsed
+    let result
     try {
-      parsed = JSON.parse(raw)
+      result = JSON.parse(raw)
     } catch {
       const match = raw.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error('Could not parse model response as JSON')
-      parsed = JSON.parse(match[0])
+      if (!match) throw new Error('Could not parse outreach from model response')
+      result = JSON.parse(match[0])
     }
 
-    res.json(parsed)
+    res.json(result)
   } catch (err) {
-    console.error('Anthropic API error:', err.message)
-    res.status(500).json({ error: err.message || 'Analysis failed' })
+    console.error('generate-outreach error:', err.message)
+    res.status(500).json({ error: err.message || 'Failed to generate outreach' })
   }
 })
 
