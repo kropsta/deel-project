@@ -68,7 +68,7 @@ async function searchExa(query, daysBack) {
   const body = {
     query,
     numResults: 10,
-    contents: { text: { maxCharacters: 800 } },
+    contents: { text: true },
   }
 
   if (daysBack) {
@@ -76,6 +76,8 @@ async function searchExa(query, daysBack) {
       .toISOString()
       .split('T')[0]
   }
+
+  console.log('Exa request:', JSON.stringify({ query, daysBack, startPublishedDate: body.startPublishedDate }))
 
   const res = await fetch('https://api.exa.ai/search', {
     method: 'POST',
@@ -86,12 +88,14 @@ async function searchExa(query, daysBack) {
     body: JSON.stringify(body),
   })
 
+  const responseText = await res.text()
+  console.log('Exa response status:', res.status, 'body:', responseText.slice(0, 300))
+
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Exa API error: ${res.status} ${err}`)
+    throw new Error(`Exa API error ${res.status}: ${responseText}`)
   }
 
-  const data = await res.json()
+  const data = JSON.parse(responseText)
   return data.results || []
 }
 
@@ -128,7 +132,7 @@ app.post('/api/find-startups', async (req, res) => {
     console.log(`Exa returned ${allResults.length} total articles`)
 
     if (allResults.length === 0) {
-      return res.status(500).json({ error: 'Exa returned no results. Check your EXA_API_KEY is set correctly in Vercel environment variables.' })
+      return res.status(500).json({ error: 'Exa returned no articles. Check the Vercel runtime logs for the exact error — likely an invalid or inactive EXA_API_KEY.' })
     }
 
     const articlesText = allResults
