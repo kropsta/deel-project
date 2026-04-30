@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# pipeline subproject
+pipeline/node_modules
+pipeline/dist
+pipeline/.env
